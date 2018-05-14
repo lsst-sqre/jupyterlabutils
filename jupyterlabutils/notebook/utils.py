@@ -1,4 +1,4 @@
-"""Utility functions for LSST Jupyter notebook environment
+"""Utility functions for LSST JupyterLab notebook environment
 """
 import bokeh
 import os
