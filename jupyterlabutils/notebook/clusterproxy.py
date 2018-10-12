@@ -12,6 +12,13 @@ def _get_hostname():
     return os.environ.get('HOSTNAME') or 'localhost'
 
 
+def _get_proxy_url(port):
+    urlprefix = os.environ.get("EXTERNAL_URL") or "http://localhost:8888"
+    user = os.environ.get("USER") or "jovyan"
+    url = "/".join([urlprefix, "user", user, "proxy", str(port)])
+    return url
+
+
 class ClusterProxy(object):
     """Provides a proxy service to map a local port to a worker node's
     dashboard, which is on port 8989.  This allows us to proxy to the
@@ -33,6 +40,7 @@ class ClusterProxy(object):
         self.logger = logging.getLogger(__name__)
         self.cluster = client.cluster
         self.ioloop = client.io_loop
+        self.scheduler = _get_proxy_url(8787) + "/status"
         self.refresh_workers()
 
     def refresh_workers(self):
@@ -68,15 +76,16 @@ class ClusterProxy(object):
         proxy = Forwarder(host, port, ioloop=self.ioloop)
         proxy.start()
         local_port = proxy.get_port()
-        urlprefix = os.environ.get("EXTERNAL_URL") or "http://localhost:8888"
-        user = os.environ.get("USER") or "jovyan"
-        url = "/".join([urlprefix, "user", user, "proxy", str(local_port)])
+        url = _get_proxy_url(local_port)
         worker = {"forwarder": proxy,
                   "url": url,
                   "local_port": local_port}
         return worker
 
     def get_proxies(self, workers):
+        """Returns a dict of worker endpoints as keys, mapped to a dict
+        containing the worker proxy url and local port it's mapped to.
+        """
         rval = {}
         if not workers:
             workers = list(self.workers.keys())
@@ -89,21 +98,23 @@ class ClusterProxy(object):
         return rval
 
     def __repr__(self):
-
-        s = "ClusterProxy {name} (workers={count:d})".format(
-            name=_get_hostname(), count=len(self.workers))
+        s = "ClusterProxy {name}:".format(name=_get_hostname())
+        s += "\n  Scheduler: {url}".format(url=self.scheduler)
         sw = self.workers
+        if sw:
+            s = s+"\n  Workers:"
         for worker in sw:
-            s += "\n  {worker}: {url}".format(worker=worker,
-                                              url=sw[worker]["url"])
+            s += "\n    {worker}: {url}".format(worker=worker,
+                                                url=sw[worker]["url"])
         return s
 
     def _repr_html_(self):
-        s = "<h3>ClusterProxy {name}<h3>", format(name=_get_hostname())
+        s = "<h3>ClusterProxy {name}</h3>".format(name=_get_hostname())
+        s += "<h4>Scheduler: {url}</h4>".format(url=self.scheduler)
         if len(self.workers) > 0:
-            s += "<dl>"
+            s += "<h4>Workers</h4><dl>"
             sw = self.workers
-            for worker, details in sw:
+            for worker in sw:
                 s += "<dt>{w}</dt><dd>{u}</dd>".format(w=worker,
                                                        u=sw[worker]["url"])
             s += "</dl>"
