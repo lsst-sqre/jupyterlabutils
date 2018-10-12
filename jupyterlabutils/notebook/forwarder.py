@@ -19,32 +19,23 @@ class Forwarder(maproxy.proxyserver.ProxyServer):
     def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(__name__)
         sockets = tornado.netutil.bind_sockets(0, '')
+        ioloop = None
+        if "ioloop" in kwargs:
+            ioloop = kwargs["ioloop"]
+            ioloop.make_current()
+            del kwargs["ioloop"]
         super().__init__(*args, **kwargs)
         self.add_sockets(sockets)
         self.bind_addresses = [x.getsockname()[:2] for x in sockets]
         self._ioloop = tornado.ioloop.IOLoop.current()
 
     def get_ports(self):
-        """Get a list the ports the Forwarder is listening to."""
+        """Returns a list of the ports the Forwarder is listening to."""
         return list(set(x[1] for x in self.bind_addresses))
 
     def get_port(self):
-        """Get the first port the Forwarder is listening to, or None."""
+        """Returns the first port the Forwarder is listening to, or None."""
         rval = self.get_ports()
         if rval and len(rval) > 0:
             return rval[0]
         return None
-
-
-class IOManager(maproxy.iomanager.IOManager):
-
-    def stop(self):
-        # The graceful bits don't seem to work.  So...
-        for id, server in self._servers.items():
-            assert isinstance(server, tornado.tcpserver.TCPServer)
-            server.stop()
-        self._stopping.set()
-        self._ioloop.stop()
-        self._running.clear()
-        self._stopping.clear()
-        self._stopped.set()
