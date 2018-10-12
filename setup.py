@@ -52,6 +52,9 @@ setuptools.setup(
     ],
     keywords='lsst',
     install_requires=[
-        'bokeh>=0.12.15'
+        'bokeh>=0.12.15',
+        'maproxy',
+        'dask',
+        'distributed'
     ],
 )
