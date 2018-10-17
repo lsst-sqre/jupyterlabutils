@@ -1,6 +1,7 @@
+import ipaddress
 import logging
-import os
 from .forwarder import Forwarder
+from .utils import get_proxy_url, get_hostname
 from dask.distributed import Client
 
 
@@ -8,24 +9,19 @@ def _remove_prefix(s, prefix):
     return s[len(prefix):] if s.startswith(prefix) else s
 
 
-def _get_hostname():
-    return os.environ.get('HOSTNAME') or 'localhost'
-
-
-def _get_proxy_url(port):
-    urlprefix = os.environ.get("EXTERNAL_URL") or "http://localhost:8888"
-    user = os.environ.get("USER") or "jovyan"
-    url = "/".join([urlprefix, "user", user, "proxy", str(port)])
-    return url
-
-
 class ClusterProxy(object):
     """Provides a proxy service to map a local port to a worker node's
-    dashboard, which is on port 8989.  This allows us to proxy to the
-    worker even though the k8s network is not accessible externally.
+    dashboard, which should be on its "bokeh" service.
+
+    This allows us to proxy to the worker even though the k8s network is not
+    accessible externally.
 
     It must be created with an instance of a dask.distributed.Client
     as its argument.
+
+    This would work better if k8s workers had a bokeh service, and if the
+    bokeh service told you how to get to its dashboard page once you have
+    the host and port.
     """
     client = None
     cluster = None
@@ -40,16 +36,18 @@ class ClusterProxy(object):
         self.logger = logging.getLogger(__name__)
         self.cluster = client.cluster
         self.ioloop = client.io_loop
-        self.scheduler = _get_proxy_url(8787) + "/status"
+        self.scheduler_url = None
+        port = client.cluster.scheduler.identity()["services"].get('bokeh')
+        if port:
+            self.scheduler_url = get_proxy_url(port) + "/status"
         self.refresh_workers()
 
     def refresh_workers(self):
         """Rebuild current worker map from actual state.
         """
-        coremap = self.client.ncores()
-        current_workerlist = list(coremap.keys())
+        current_workers = self.cluster.scheduler.identity().get('workers')
         current_workerlist = [_remove_prefix(x, "tcp://")
-                              for x in current_workerlist]
+                              for x in current_workers]
         removed_workers = []
         for worker_id in self.workers:
             if worker_id not in current_workerlist:
@@ -60,7 +58,9 @@ class ClusterProxy(object):
             del self.workers[worker_id]
         for worker_id in current_workerlist:
             if worker_id not in self.workers:
-                self.workers[worker_id] = self._create_worker_proxy(worker_id)
+                worker_record = current_workerlist[worker_id]
+                self.workers[worker_id] = self._create_worker_proxy(
+                    worker_record)
             # Otherwise it hasn't changed.
 
     def _remove_worker_proxy(self, worker_id):
@@ -70,13 +70,20 @@ class ClusterProxy(object):
         forwarder = worker["forwarder"]
         forwarder.stop()
 
-    def _create_worker_proxy(self, worker_id):
-        host = worker_id.split(":")[0]
-        port = 8989
-        proxy = Forwarder(host, port, ioloop=self.ioloop)
-        proxy.start()
-        local_port = proxy.get_port()
-        url = _get_proxy_url(local_port)
+    def _create_worker_proxy(self, worker_record):
+        host = worker_record["host"]
+        ipaddr = ipaddress.IPAddress(host)
+        port = worker_record["services"].get("bokeh")
+        if not port:
+            return None
+        if ipaddr.is_local():
+            proxy = None
+            local_port = port
+        else:
+            proxy = Forwarder(host, port, ioloop=self.ioloop)
+            proxy.start()
+            local_port = proxy.get_port()
+        url = get_proxy_url(local_port)
         worker = {"forwarder": proxy,
                   "url": url,
                   "local_port": local_port}
@@ -98,8 +105,8 @@ class ClusterProxy(object):
         return rval
 
     def __repr__(self):
-        s = "ClusterProxy {name}:".format(name=_get_hostname())
-        s += "\n  Scheduler: {url}".format(url=self.scheduler)
+        s = "ClusterProxy {name}:".format(name=get_hostname())
+        s += "\n  Scheduler: {url}".format(url=self.scheduler_url)
         sw = self.workers
         if sw:
             s = s+"\n  Workers:"
@@ -109,8 +116,8 @@ class ClusterProxy(object):
         return s
 
     def _repr_html_(self):
-        s = "<h3>ClusterProxy {name}</h3>".format(name=_get_hostname())
-        s += "<h4>Scheduler: {url}</h4>".format(url=self.scheduler)
+        s = "<h3>ClusterProxy {name}</h3>".format(name=get_hostname())
+        s += "<h4>Scheduler: {url}</h4>".format(url=self.scheduler_url)
         if len(self.workers) > 0:
             s += "<h4>Workers</h4><dl>"
             sw = self.workers

@@ -1,10 +1,7 @@
-import functools
 import logging
 import maproxy.proxyserver
 import maproxy.iomanager
 import tornado.netutil
-import threading
-import time
 
 
 class Forwarder(maproxy.proxyserver.ProxyServer):
