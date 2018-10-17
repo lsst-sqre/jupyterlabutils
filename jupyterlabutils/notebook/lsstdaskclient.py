@@ -69,7 +69,7 @@ class LSSTDaskClient(Client):
                     "  <li><b>Scheduler: not connected</b>\n")
         sched_addr = self.proxy_url or scheduler.address
         if info and 'bokeh' in info['services']:
-            protocol, rest = sched_addr.address.split('://')
+            protocol, rest = sched_addr.split('://')
             port = info['services']['bokeh']
             if protocol == 'inproc':
                 host = 'localhost'
