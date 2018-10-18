@@ -46,8 +46,7 @@ class ClusterProxy(object):
         """Rebuild current worker map from actual state.
         """
         current_workers = self.cluster.scheduler.identity().get('workers')
-        current_workerlist = [_remove_prefix(x, "tcp://")
-                              for x in current_workers]
+        current_workerlist = list(current_workers.keys())
         removed_workers = []
         for worker_id in self.workers:
             if worker_id not in current_workerlist:
@@ -72,11 +71,11 @@ class ClusterProxy(object):
 
     def _create_worker_proxy(self, worker_record):
         host = worker_record["host"]
-        ipaddr = ipaddress.IPAddress(host)
+        ipaddr = ipaddress.ip_address(host)
         port = worker_record["services"].get("bokeh")
         if not port:
             return None
-        if ipaddr.is_local():
+        if ipaddr.is_loopback:
             proxy = None
             local_port = port
         else:
@@ -105,7 +104,7 @@ class ClusterProxy(object):
         return rval
 
     def __repr__(self):
-        s = "ClusterProxy {name}:".format(name=get_hostname())
+        s = "<ClusterProxy {name}>".format(name=get_hostname())
         s += "\n  Scheduler: {url}".format(url=self.scheduler_url)
         sw = self.workers
         if sw:
@@ -116,13 +115,15 @@ class ClusterProxy(object):
         return s
 
     def _repr_html_(self):
-        s = "<h3>ClusterProxy {name}</h3>".format(name=get_hostname())
-        s += "<h4>Scheduler: {url}</h4>".format(url=self.scheduler_url)
+        s = "<h4>&lt;ClusterProxy {name}&gt;</h4>".format(name=get_hostname())
+        s += " <b>Scheduler: <a href=\'{u}\'>{u}</a></b>".format(
+            u=self.scheduler_url)
         if len(self.workers) > 0:
-            s += "<h4>Workers</h4><dl>"
+            s += "<h4>Workers</h4>\n<dl>\n"
             sw = self.workers
             for worker in sw:
-                s += "<dt>{w}</dt><dd>{u}</dd>".format(w=worker,
-                                                       u=sw[worker]["url"])
+                s += "<dt><b>{w}</b></dt>".format(w=worker)
+                s += "<dd><a href=\'{u}\'>{u}</href></a></dd>\n".format(
+                    u=sw[worker]["url"])
             s += "</dl>"
         return s
