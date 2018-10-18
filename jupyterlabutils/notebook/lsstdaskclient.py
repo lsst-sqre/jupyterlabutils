@@ -67,9 +67,14 @@ class LSSTDaskClient(Client):
             text = ("<h3>Client</h3>\n"
                     "<ul>\n"
                     "  <li><b>Scheduler: not connected</b>\n")
-        sched_addr = self.proxy_url or scheduler.address
-        if info and 'bokeh' in info['services']:
-            protocol, rest = sched_addr.split('://')
+        text += "  <li><b>Dashboard: </b>"
+        if self.proxy_url:
+            url = self.proxy_url + "/status"
+            text += "<br> "
+            text += "<a href='{addr}' target='_blank'>{addr}</a>\n".format(
+                addr=url)
+        elif info and 'bokeh' in info['services']:
+            protocol, rest = scheduler.address.split('://')
             port = info['services']['bokeh']
             if protocol == 'inproc':
                 host = 'localhost'
@@ -77,7 +82,6 @@ class LSSTDaskClient(Client):
                 host = rest.split(':')[0]
             template = dask.config.get('distributed.dashboard.link')
             address = template.format(host=host, port=port, **os.environ)
-            text += "  <li><b>Dashboard: </b>"
             text += "<a href='%(web)s' target='_blank'>%(web)s</a>\n" % {
                 'web': address}
 
