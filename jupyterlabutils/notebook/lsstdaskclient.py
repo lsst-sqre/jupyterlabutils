@@ -1,4 +1,4 @@
-from .utils import get_proxy_url
+from .utils import get_proxy_url, format_bytes
 import dask
 from dask.distributed import Client, sync
 import logging
@@ -91,7 +91,7 @@ class LSSTDaskClient(Client):
             workers = len(info['workers'])
             cores = sum(w['ncores'] for w in info['workers'].values())
             memory = sum(w['memory_limit'] for w in info['workers'].values())
-            # memory = format_bytes(memory)
+            memory = format_bytes(memory)
             text2 = ("<h3>Cluster</h3>\n"
                      "<ul>\n"
                      "  <li><b>Workers: </b>%d</li>\n"
