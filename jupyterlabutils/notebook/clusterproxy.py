@@ -57,7 +57,7 @@ class ClusterProxy(object):
             del self.workers[worker_id]
         for worker_id in current_workerlist:
             if worker_id not in self.workers:
-                worker_record = current_workerlist[worker_id]
+                worker_record = current_workers[worker_id]
                 self.workers[worker_id] = self._create_worker_proxy(
                     worker_record)
             # Otherwise it hasn't changed.
