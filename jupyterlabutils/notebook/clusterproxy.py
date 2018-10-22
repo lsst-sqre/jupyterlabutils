@@ -99,8 +99,10 @@ class ClusterProxy(object):
             if type(workers) is str:
                 workers = [workers]
         for worker in workers:
-            rval[worker] = {"url": self.workers[worker]["url"],
-                            "local_port": self.workers[worker]["local_port"]}
+            if not worker:
+                continue
+            for val in ["url", "local_port"]:
+                rval[worker][val] = self.workers[worker].get(val),
         return rval
 
     def __repr__(self):
