@@ -1,7 +1,7 @@
-import ipaddress
-import logging
 from .forwarder import Forwarder
 from .utils import get_proxy_url, get_hostname
+import ipaddress
+import logging
 from dask.distributed import Client
 
 
@@ -67,6 +67,8 @@ class ClusterProxy(object):
         if not worker:
             return
         forwarder = worker["forwarder"]
+        if not forwarder:
+            return
         forwarder.stop()
 
     def _create_worker_proxy(self, worker_record):
@@ -108,6 +110,7 @@ class ClusterProxy(object):
     def __repr__(self):
         s = "<ClusterProxy {name}>".format(name=get_hostname())
         s += "\n  Scheduler: {url}".format(url=self.scheduler_url)
+        self.refresh_workers()
         sw = self.workers
         if sw:
             s = s+"\n  Workers:"
@@ -122,6 +125,7 @@ class ClusterProxy(object):
             u=self.scheduler_url)
         if len(self.workers) > 0:
             s += "<h4>Workers</h4>\n<dl>\n"
+            self.refresh_workers()
             sw = self.workers
             for worker in sw:
                 s += "<dt><b>{w}</b></dt>".format(w=worker)
