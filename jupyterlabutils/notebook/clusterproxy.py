@@ -82,7 +82,7 @@ class ClusterProxy(object):
             proxy = Forwarder(host, port, ioloop=self.ioloop)
             proxy.start()
             local_port = proxy.get_port()
-        url = get_proxy_url(local_port)
+        url = get_proxy_url(local_port) + "/main"
         worker = {"forwarder": proxy,
                   "url": url,
                   "local_port": local_port}
