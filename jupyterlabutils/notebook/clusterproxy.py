@@ -67,6 +67,8 @@ class ClusterProxy(object):
         if not worker:
             return
         forwarder = worker["forwarder"]
+        if not forwarder:
+            return
         forwarder.stop()
 
     def _create_worker_proxy(self, worker_record):
