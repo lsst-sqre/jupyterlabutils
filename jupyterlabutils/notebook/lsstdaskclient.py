@@ -31,6 +31,7 @@ class LSSTDaskClient(Client):
 
     def __repr__(self):
         # Note: avoid doing I/O here...
+        self._update_scheduler_info()
         info = self._scheduler_identity
         addr = self.proxy_url or info.get('address')
         if addr:
@@ -46,6 +47,7 @@ class LSSTDaskClient(Client):
             return '<%s: not connected>' % (self.__class__.__name__,)
 
     def _repr_html_(self):
+        self._update_scheduler_info()
         if (self.cluster and hasattr(self.cluster, 'scheduler') and
                 self.cluster.scheduler):
             info = self.cluster.scheduler.identity()
