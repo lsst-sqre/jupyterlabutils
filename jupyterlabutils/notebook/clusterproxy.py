@@ -18,10 +18,6 @@ class ClusterProxy(object):
 
     It must be created with an instance of a dask.distributed.Client
     as its argument.
-
-    This would work better if k8s workers had a bokeh service, and if the
-    bokeh service told you how to get to its dashboard page once you have
-    the host and port.
     """
     client = None
     cluster = None
