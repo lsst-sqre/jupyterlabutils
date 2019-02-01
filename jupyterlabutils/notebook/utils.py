@@ -37,7 +37,7 @@ def format_bytes(n):
 
 
 def get_proxy_url(port):
-    """Assumes the LSST environment and that nbserverproxy is running.
+    """Assumes the LSST environment and that jupyter-server-proxy is running.
     Returns the external address that will resolve to the supplied port
     """
     if not port:
