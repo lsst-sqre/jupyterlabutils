@@ -97,7 +97,7 @@ class LSSTDaskClient(Client):
             text2 = ("<h3>Cluster</h3>\n"
                      "<ul>\n"
                      "  <li><b>Workers: </b>%d</li>\n"
-                     "  <li><b>Cores: </b>%d</li>\n"
+                     "  <li><b>Threads: </b>%d</li>\n"
                      "  <li><b>Memory: </b>%s</li>\n"
                      "</ul>\n") % (workers, threads, memory)
 
