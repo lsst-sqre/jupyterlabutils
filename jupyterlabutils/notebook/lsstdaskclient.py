@@ -27,7 +27,7 @@ class LSSTDaskClient(Client):
             logger.debug("Not able to query scheduler for identity")
         srv = self._scheduler_identity.get("services")
         if srv:
-            self.proxy_url = get_proxy_url(srv.get("bokeh"))
+            self.proxy_url = get_proxy_url(srv.get("dashboard"))
 
     def __repr__(self):
         # Note: avoid doing I/O here...
@@ -75,9 +75,9 @@ class LSSTDaskClient(Client):
             text += "<br> "
             text += "<a href='{addr}' target='_blank'>{addr}</a>\n".format(
                 addr=url)
-        elif info and 'bokeh' in info['services']:
+        elif info and 'dashboard' in info['services']:
             protocol, rest = scheduler.address.split('://')
-            port = info['services']['bokeh']
+            port = info['services']['dashboard']
             if protocol == 'inproc':
                 host = 'localhost'
             else:
