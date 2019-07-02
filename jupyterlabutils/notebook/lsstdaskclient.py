@@ -27,7 +27,7 @@ class LSSTDaskClient(Client):
             logger.debug("Not able to query scheduler for identity")
         srv = self._scheduler_identity.get("services")
         if srv:
-            self.proxy_url = get_proxy_url(srv.get("bokeh"))
+            self.proxy_url = get_proxy_url(srv.get("dashboard"))
 
     def __repr__(self):
         # Note: avoid doing I/O here...
@@ -37,9 +37,9 @@ class LSSTDaskClient(Client):
         if addr:
             workers = info.get('workers', {})
             nworkers = len(workers)
-            ncores = sum(w['ncores'] for w in workers.values())
-            return '<%s: scheduler=%r processes=%d cores=%d>' % (
-                self.__class__.__name__, addr, nworkers, ncores)
+            nthreads = sum(w['nthreads'] for w in workers.values())
+            return '<%s: scheduler=%r processes=%d threadss=%d>' % (
+                self.__class__.__name__, addr, nworkers, nthreads)
         elif self.scheduler is not None:
             return '<%s: scheduler=%r>' % (
                 self.__class__.__name__, self.scheduler.address)
@@ -75,9 +75,9 @@ class LSSTDaskClient(Client):
             text += "<br> "
             text += "<a href='{addr}' target='_blank'>{addr}</a>\n".format(
                 addr=url)
-        elif info and 'bokeh' in info['services']:
+        elif info and 'dashboard' in info['services']:
             protocol, rest = scheduler.address.split('://')
-            port = info['services']['bokeh']
+            port = info['services']['dashboard']
             if protocol == 'inproc':
                 host = 'localhost'
             else:
@@ -91,15 +91,15 @@ class LSSTDaskClient(Client):
 
         if info:
             workers = len(info['workers'])
-            cores = sum(w['ncores'] for w in info['workers'].values())
+            threads = sum(w['nthreads'] for w in info['workers'].values())
             memory = sum(w['memory_limit'] for w in info['workers'].values())
             memory = format_bytes(memory)
             text2 = ("<h3>Cluster</h3>\n"
                      "<ul>\n"
                      "  <li><b>Workers: </b>%d</li>\n"
-                     "  <li><b>Cores: </b>%d</li>\n"
+                     "  <li><b>Threads: </b>%d</li>\n"
                      "  <li><b>Memory: </b>%s</li>\n"
-                     "</ul>\n") % (workers, cores, memory)
+                     "</ul>\n") % (workers, threads, memory)
 
             return ('<table style="border: 2px solid white;">\n'
                     '<tr>\n'

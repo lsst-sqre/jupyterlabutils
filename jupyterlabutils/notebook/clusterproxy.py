@@ -11,7 +11,7 @@ def _remove_prefix(s, prefix):
 
 class ClusterProxy(object):
     """Provides a proxy service to map a local port to a worker node's
-    dashboard, which should be on its "bokeh" service.
+    dashboard, which should be on its "dashboard" service.
 
     This allows us to proxy to the worker even though the k8s network is not
     accessible externally.
@@ -33,7 +33,7 @@ class ClusterProxy(object):
         self.cluster = client.cluster
         self.ioloop = client.io_loop
         self.scheduler_url = None
-        port = client.cluster.scheduler.identity()["services"].get('bokeh')
+        port = client.cluster.scheduler.identity()["services"].get("dashboard")
         if port:
             self.scheduler_url = get_proxy_url(port) + "/status"
         self.refresh_workers()
@@ -70,7 +70,7 @@ class ClusterProxy(object):
     def _create_worker_proxy(self, worker_record):
         host = worker_record["host"]
         ipaddr = ipaddress.ip_address(host)
-        port = worker_record["services"].get("bokeh")
+        port = worker_record["services"].get("dashboard")
         if not port:
             return None
         if ipaddr.is_loopback:
