@@ -5,7 +5,6 @@ import logging
 import os
 from tornado import gen
 from tornado.ioloop import IOLoop
-
 logger = logging.getLogger(__name__)
 
 
@@ -20,6 +19,7 @@ class LSSTDaskClient(Client):
     @gen.coroutine
     def _update_scheduler_info(self):
         if self.status not in ('running', 'connecting'):
+            logger.debug("Unexpected status '%s'" % self.status)
             return
         try:
             self._scheduler_identity = yield self.scheduler.identity()
