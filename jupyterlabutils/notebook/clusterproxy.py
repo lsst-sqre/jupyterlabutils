@@ -111,7 +111,7 @@ class ClusterProxy(object):
         worker = {"forwarder": proxy,
                   "url": url,
                   "local_port": local_port}
-        self.log.debug("Worker proxy created: {}".format(worker))
+        self.logger.debug("Worker proxy created: {}".format(worker))
         return worker
 
     def get_proxies(self, workers):
