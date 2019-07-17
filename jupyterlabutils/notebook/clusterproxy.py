@@ -140,8 +140,9 @@ class ClusterProxy(object):
         if sw:
             s = s+"\n  Workers:"
         for worker in sw:
+            url = sw[worker].get("url")
             s += "\n    {worker}: {url}".format(worker=worker,
-                                                url=worker.get("url"))
+                                                url=url)
         return s
 
     def _repr_html_(self):
@@ -153,8 +154,9 @@ class ClusterProxy(object):
             self.refresh_workers()
             sw = self.workers
             for worker in sw:
+                url = sw[worker].get("url")
                 s += "<dt><b>{w}</b></dt>".format(w=worker)
                 s += "<dd><a href=\'{u}\'>{u}</href></a></dd>\n".format(
-                    u=worker.get("url"))
+                    u=url)
             s += "</dl>"
         return s
