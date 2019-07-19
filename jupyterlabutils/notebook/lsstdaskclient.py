@@ -1,6 +1,8 @@
 from .utils import get_proxy_url, format_bytes
 import dask
 from dask.distributed import Client, sync
+from datetime import timedelta
+from distributed.utils import thread_state
 import logging
 import os
 from tornado import gen
@@ -10,11 +12,42 @@ logger = logging.getLogger(__name__)
 
 class LSSTDaskClient(Client):
     """This uses the proxy info to provide an externally-reachable dashboard
-    URL for the Client.  Other than that it does nothing differently from the
-    standard dask.distributed.Client.  It assumes the LSST JupyterLab
-    environment.
+    URL for the Client.  It assumes the LSST JupyterLab environment, and sets
+    a one-hour total timeout for results.  Otherwise it is a standard Dask
+    client.
     """
     proxy_url = None
+
+    def sync(self, func, *args, asynchronous=None, callback_timeout=3600,
+             **kwargs):
+        if (
+            asynchronous
+            or self.asynchronous
+            or getattr(thread_state, "asynchronous", False)
+        ):
+            future = func(*args, **kwargs)
+            if callback_timeout is not None:
+                future = gen.with_timeout(timedelta(seconds=callback_timeout),
+                                          future)
+            return future
+        else:
+            if callback_timeout is None:
+                callback_timeout = self.callback_timeout or 3600
+            attempt_timeout = self._timeout or 15
+            while attempt_timeout < callback_timeout:
+                try:
+                    return sync(
+                        self.loop, func, *args,
+                        callback_timeout=attempt_timeout,
+                        **kwargs
+                    )
+                except TimeoutError as exc:
+                    logger.warning("Timeout: {}".format(exc))
+                    attempt_timeout = attempt_timeout * 2
+                    if attempt_timeout < callback_timeout:
+                        logger.warning(
+                            "Retry: {}s timeout.".format(attempt_timeout))
+            raise TimeoutError("timed out after {} s.".format(attempt_timeout))
 
     @gen.coroutine
     def _update_scheduler_info(self):
@@ -55,7 +88,8 @@ class LSSTDaskClient(Client):
         elif (self._loop_runner.is_started() and
                 self.scheduler and
                 not (self.asynchronous and self.loop is IOLoop.current())):
-            info = sync(self.loop, self.scheduler.identity)
+            info = sync(self.loop, self.scheduler.identity,
+                        callback_timeout=(self._timeout or 15))
             scheduler = self.scheduler
         else:
             info = False
