@@ -17,8 +17,9 @@ class LSSTDaskClient(Client):
     client.
     """
     proxy_url = None
+    overall_timeout = 3600
 
-    def sync(self, func, *args, asynchronous=None, callback_timeout=3600,
+    def sync(self, func, *args, asynchronous=None, callback_timeout=None,
              **kwargs):
         if (
             asynchronous
@@ -32,7 +33,7 @@ class LSSTDaskClient(Client):
             return future
         else:
             if callback_timeout is None:
-                callback_timeout = self.callback_timeout or 3600
+                callback_timeout = self.overall_timeout or 3600
             attempt_timeout = self._timeout or 15
             while attempt_timeout < callback_timeout:
                 try:
