@@ -12,12 +12,23 @@ logger = logging.getLogger(__name__)
 
 class LSSTDaskClient(Client):
     """This uses the proxy info to provide an externally-reachable dashboard
-    URL for the Client.  It assumes the LSST JupyterLab environment, and sets
-    a one-hour total timeout for results.  Otherwise it is a standard Dask
-    client.
+    URL for the Client.  It assumes the LSST JupyterLab environment, and uses
+    an "overall_timeout" parameter for how long to wait on a cell's results
+    before giving up; this parameter is an integer, represents the wait time
+    in seconds, and defaults to 3600 (-1 is "never time out).  Otherwise it
+    is a standard Dask client.
     """
     proxy_url = None
     overall_timeout = 3600
+
+    def __init__(self, *args, **kwargs):
+        ot = kwargs.pop('overall_timeout', None)
+        super().__init__(*args, **kwargs)
+        if ot:
+            if ot == -1:
+                self.overall_timeout = None
+            else:
+                self.overall_timeout = ot
 
     def sync(self, func, *args, asynchronous=None, callback_timeout=None,
              **kwargs):
@@ -33,20 +44,24 @@ class LSSTDaskClient(Client):
             return future
         else:
             if callback_timeout is None:
-                callback_timeout = self.overall_timeout or 3600
+                callback_timeout = self.overall_timeout
+            so_far = 0
             attempt_timeout = self._timeout or 15
-            while attempt_timeout < callback_timeout:
+            while so_far < callback_timeout:
+                so_far += attempt_timeout
                 try:
                     return sync(
                         self.loop, func, *args,
                         callback_timeout=attempt_timeout,
                         **kwargs
                     )
-                except TimeoutError as exc:
-                    logger.warning("Timeout: {}".format(exc))
+                except gen.TimeoutError as exc:
+                    logger.debug("Timeout: {}".format(exc))
                     attempt_timeout = attempt_timeout * 2
-                    if attempt_timeout < callback_timeout:
-                        logger.warning(
+                    if so_far + attempt_timeout >= callback_timeout:
+                        attempt_timeout = callback_timeout - so_far
+                    if attempt_timeout > 0:
+                        logger.debug(
                             "Retry: {}s timeout.".format(attempt_timeout))
             raise TimeoutError("timed out after {} s.".format(attempt_timeout))
 
