@@ -21,7 +21,7 @@ class ClusterProxy(object):
     """
     client = None
     cluster = None
-    ioloop = None
+    loop = None
     workers = {}
 
     def __init__(self, client):
@@ -31,17 +31,33 @@ class ClusterProxy(object):
         self.client = client
         self.logger = logging.getLogger(__name__)
         self.cluster = client.cluster
-        self.ioloop = client.io_loop
+        self.loop = client.loop
         self.scheduler_url = None
-        port = client.cluster.scheduler.identity()["services"].get("dashboard")
-        if port:
-            self.scheduler_url = get_proxy_url(port) + "/status"
+        sched = client.cluster.scheduler.identity()
+        if sched:
+            svc = sched.get("services")
+            if svc:
+                port = svc.get("dashboard")
+                if port:
+                    self.scheduler_url = get_proxy_url(port) + "/status"
+                else:
+                    self.logger.warning("No port for dashboard service.")
+            else:
+                self.logger.warning("No services for scheduler.")
+        else:
+            self.logger.warning("No scheduler.")
         self.refresh_workers()
+        self.logger.debug("Created LSSTDaskClient:\n%s" % str(self))
 
     def refresh_workers(self):
         """Rebuild current worker map from actual state.
         """
-        current_workers = self.cluster.scheduler.identity().get('workers')
+        sched = self.cluster.scheduler.identity()
+        if not sched:
+            self.logger.warning("No scheduler.")
+        current_workers = sched.get('workers')
+        if not current_workers:
+            self.logger.warning("No workers for scheduler.")
         current_workerlist = list(current_workers.keys())
         removed_workers = []
         for worker_id in self.workers:
@@ -62,28 +78,40 @@ class ClusterProxy(object):
         worker = self.workers.get(worker_id)
         if not worker:
             return
-        forwarder = worker["forwarder"]
+        forwarder = worker.get("forwarder")
         if not forwarder:
             return
         forwarder.stop()
+        del worker["forwarder"]
+        del worker["url"]
+        del worker["local_url"]
 
     def _create_worker_proxy(self, worker_record):
-        host = worker_record["host"]
+        host = worker_record.get("host")
+        if not host:
+            self.logger.warning("No host in worker record")
+            return None
         ipaddr = ipaddress.ip_address(host)
-        port = worker_record["services"].get("dashboard")
+        svc = worker_record.get("services")
+        if not svc:
+            self.logger.warning("No services in worker record")
+            return None
+        port = svc.get("dashboard")
         if not port:
+            self.logger.warning("No 'dashboard' service")
             return None
         if ipaddr.is_loopback:
             proxy = None
             local_port = port
         else:
-            proxy = Forwarder(host, port, ioloop=self.ioloop)
+            proxy = Forwarder(host, port, ioloop=self.loop)
             proxy.start()
             local_port = proxy.get_port()
         url = get_proxy_url(local_port) + "/main"
         worker = {"forwarder": proxy,
                   "url": url,
                   "local_port": local_port}
+        self.logger.debug("Worker proxy created: {}".format(worker))
         return worker
 
     def get_proxies(self, workers):
@@ -100,7 +128,8 @@ class ClusterProxy(object):
             if not worker:
                 continue
             for val in ["url", "local_port"]:
-                rval[worker][val] = self.workers[worker].get(val),
+                rval[worker][val] = self.workers[worker].get(val)
+        self.log.debug("Worker proxies: {}".format(rval))
         return rval
 
     def __repr__(self):
@@ -111,8 +140,9 @@ class ClusterProxy(object):
         if sw:
             s = s+"\n  Workers:"
         for worker in sw:
+            url = sw[worker].get("url")
             s += "\n    {worker}: {url}".format(worker=worker,
-                                                url=sw[worker]["url"])
+                                                url=url)
         return s
 
     def _repr_html_(self):
@@ -124,8 +154,9 @@ class ClusterProxy(object):
             self.refresh_workers()
             sw = self.workers
             for worker in sw:
+                url = sw[worker].get("url")
                 s += "<dt><b>{w}</b></dt>".format(w=worker)
                 s += "<dd><a href=\'{u}\'>{u}</href></a></dd>\n".format(
-                    u=sw[worker]["url"])
+                    u=url)
             s += "</dl>"
         return s

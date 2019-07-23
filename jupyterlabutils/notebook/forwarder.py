@@ -15,16 +15,26 @@ class Forwarder(maproxy.proxyserver.ProxyServer):
 
     def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(__name__)
+        self._logger.debug("Creating TCP Forwarder")
         sockets = tornado.netutil.bind_sockets(0, '')
         ioloop = None
+        save_ioloop = None
         if "ioloop" in kwargs:
+            self._logger.debug("IOLoop specified; saving current")
             ioloop = kwargs["ioloop"]
-            ioloop.make_current()
+            save_ioloop = tornado.ioloop.IOLoop.current()
+            if ioloop != save_ioloop:
+                self._logger.debug("Switching IOLoop")
+                ioloop.make_current()
             del kwargs["ioloop"]
         super().__init__(*args, **kwargs)
         self.add_sockets(sockets)
         self.bind_addresses = [x.getsockname()[:2] for x in sockets]
         self._ioloop = tornado.ioloop.IOLoop.current()
+        if save_ioloop and save_ioloop != self._ioloop:
+            self._logger.debug("Restoring IOLoop")
+            save_ioloop.make_current()
+        self._logger.debug("TCP Forwarder created")
 
     def get_ports(self):
         """Returns a list of the ports the Forwarder is listening to."""
