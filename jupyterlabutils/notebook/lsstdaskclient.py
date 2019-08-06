@@ -1,5 +1,4 @@
 from .utils import get_proxy_url, format_bytes
-import asyncio
 import dask
 from dask.distributed import Client, sync
 from datetime import timedelta
@@ -66,7 +65,8 @@ class LSSTDaskClient(Client):
                             "Retry: {}s timeout.".format(attempt_timeout))
             raise TimeoutError("timed out after {} s.".format(attempt_timeout))
 
-    async def _update_scheduler_info(self):
+    @gen.coroutine
+    def _update_scheduler_info(self):
         if self.status not in ('running', 'connecting'):
             logger.debug("Unexpected status '%s'" % self.status)
             return
