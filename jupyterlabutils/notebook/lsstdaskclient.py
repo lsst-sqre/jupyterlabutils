@@ -87,7 +87,7 @@ class LSSTDaskClient(Client):
             workers = info.get('workers', {})
             nworkers = len(workers)
             nthreads = sum(w['nthreads'] for w in workers.values())
-            return '<%s: scheduler=%r processes=%d threadss=%d>' % (
+            return '<%s: scheduler=%r processes=%d threads=%d>' % (
                 self.__class__.__name__, addr, nworkers, nthreads)
         elif self.scheduler is not None:
             return '<%s: scheduler=%r>' % (
