@@ -55,6 +55,7 @@ setuptools.setup(
         'bokeh>=0.12.15',
         'maproxy',
         'dask>=2.0.0',
-        'distributed>=2.0.0'
+        'distributed>=2.0.0',
+        'requests>=2.22.0'
     ],
 )
