@@ -1,7 +1,7 @@
 import requests
 import os
 import pyvo
-import pyvo.extensions.auth.authsession
+import pyvo.auth.authsession
 
 def _get_tap_url():
     if 'EXTERNAL_TAP_URL' in os.environ:
@@ -13,7 +13,7 @@ def _get_auth():
     tap_url = _get_tap_url()
     s = requests.Session()
     s.headers['Authorization'] = 'Bearer ' + os.environ['ACCESS_TOKEN']
-    auth = pyvo.extensions.auth.authsession.AuthSession()
+    auth = pyvo.auth.authsession.AuthSession()
     auth.credentials.set('lsst-token', s)
     auth.add_security_method_for_url(tap_url, 'lsst-token')
     auth.add_security_method_for_url(tap_url + '/sync', 'lsst-token')

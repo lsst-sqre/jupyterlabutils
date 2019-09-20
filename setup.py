@@ -56,6 +56,7 @@ setuptools.setup(
         'maproxy',
         'dask>=2.0.0',
         'distributed>=2.0.0',
+        'pyvo>=1.0',
         'requests>=2.22.0'
     ],
 )
