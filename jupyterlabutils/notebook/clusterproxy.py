@@ -2,6 +2,7 @@ from .forwarder import Forwarder
 from .utils import get_proxy_url, get_hostname
 import ipaddress
 import logging
+import semver
 from dask.distributed import Client
 
 
@@ -11,7 +12,8 @@ def _remove_prefix(s, prefix):
 
 class ClusterProxy(object):
     """Provides a proxy service to map a local port to a worker node's
-    dashboard, which should be on its "dashboard" service.
+    dashboard, which should be on its "dashboard" service if it is using
+    distributed 2 or later, "bokeh" if not.
 
     This allows us to proxy to the worker even though the k8s network is not
     accessible externally.
@@ -22,6 +24,7 @@ class ClusterProxy(object):
     client = None
     cluster = None
     loop = None
+    dbvar = None
     workers = {}
 
     def __init__(self, client):
@@ -29,6 +32,14 @@ class ClusterProxy(object):
             estr = "'client' argument must be dask.distributed.Client!"
             raise RuntimeError(estr)
         self.client = client
+        _dv = client.get_versions()['client']['packages']['required']
+        self._dbvar = "bokeh"
+        for val in _dv:
+            if val[0] == 'distributed':
+                _vv = val[1]
+                if semver.compare(_vv, '2.0.0') != -1:
+                    self._dbvar = "dashboard"
+
         self.logger = logging.getLogger(__name__)
         self.cluster = client.cluster
         self.loop = client.loop
@@ -37,11 +48,12 @@ class ClusterProxy(object):
         if sched:
             svc = sched.get("services")
             if svc:
-                port = svc.get("dashboard")
+                port = svc.get(self._dbvar)
                 if port:
                     self.scheduler_url = get_proxy_url(port) + "/status"
                 else:
-                    self.logger.warning("No port for dashboard service.")
+                    self.logger.warning("No port for '" + self._dbvar +
+                                        "' service.")
             else:
                 self.logger.warning("No services for scheduler.")
         else:
@@ -96,9 +108,9 @@ class ClusterProxy(object):
         if not svc:
             self.logger.warning("No services in worker record")
             return None
-        port = svc.get("dashboard")
+        port = svc.get(self._dbvar)
         if not port:
-            self.logger.warning("No 'dashboard' service")
+            self.logger.warning("No '{}' service".format(self._dbvar))
             return None
         if ipaddr.is_loopback:
             proxy = None

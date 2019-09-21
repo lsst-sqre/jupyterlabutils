@@ -1,10 +1,11 @@
 from .utils import get_proxy_url, format_bytes
 import dask
-from dask.distributed import Client, sync
+from distributed import Client, sync
 from datetime import timedelta
 from distributed.utils import thread_state
 import logging
 import os
+import semver
 from tornado import gen
 from tornado.ioloop import IOLoop
 logger = logging.getLogger(__name__)
@@ -20,6 +21,15 @@ class LSSTDaskClient(Client):
     """
     proxy_url = None
     overall_timeout = 3600
+    _new_distributed = True
+    # "ncores" parameter became "nthreads" in distributed 2.0;
+    # "bokeh" service became "dashboard" in distributed 2.0.
+    _dask_map = {
+        "nthreads": {True: "nthreads",
+                     False: "ncores"},
+        "dashboard": {True: "dashboard",
+                      False: "bokeh"}
+        }
 
     def __init__(self, *args, **kwargs):
         ot = kwargs.pop('overall_timeout', None)
@@ -29,6 +39,12 @@ class LSSTDaskClient(Client):
                 self.overall_timeout = None
             else:
                 self.overall_timeout = ot
+        _dv = self.get_versions()['client']['packages']['required']
+        for val in _dv:
+            if val[0] == 'distributed':
+                _vv = val[1]
+                if semver.compare(_vv, '2.0.0') == -1:
+                    self._new_distributed = False
 
     def sync(self, func, *args, asynchronous=None, callback_timeout=None,
              **kwargs):
@@ -76,7 +92,8 @@ class LSSTDaskClient(Client):
             logger.debug("Not able to query scheduler for identity")
         srv = self._scheduler_identity.get("services")
         if srv:
-            self.proxy_url = get_proxy_url(srv.get("dashboard"))
+            dbvar = self._dask_map["dashboard"][self._new_distributed]
+            self.proxy_url = get_proxy_url(srv.get(dbvar))
 
     def __repr__(self):
         # Note: avoid doing I/O here...
@@ -86,7 +103,9 @@ class LSSTDaskClient(Client):
         if addr:
             workers = info.get('workers', {})
             nworkers = len(workers)
-            nthreads = sum(w['nthreads'] for w in workers.values())
+            # Get correct thread count name for Distributed version
+            thread_var = self._dask_map["nthreads"][self._new_distributed]
+            nthreads = sum(w[thread_var] for w in workers.values())
             return '<%s: scheduler=%r processes=%d threads=%d>' % (
                 self.__class__.__name__, addr, nworkers, nthreads)
         elif self.scheduler is not None:
@@ -120,19 +139,22 @@ class LSSTDaskClient(Client):
                     "<ul>\n"
                     "  <li><b>Scheduler: not connected</b>\n")
         text += "  <li><b>Dashboard: </b>"
+        # Get correct dashboard name for Distributed version
+        dbvar = self._dask_map["dashboard"][self._new_distributed]
+        dconf = "distributed.{}.link".format(dbvar)
         if self.proxy_url:
             url = self.proxy_url + "/status"
             text += "<br> "
             text += "<a href='{addr}' target='_blank'>{addr}</a>\n".format(
                 addr=url)
-        elif info and 'dashboard' in info['services']:
+        elif info and dbvar in info['services']:
             protocol, rest = scheduler.address.split('://')
-            port = info['services']['dashboard']
+            port = info['services'][dbvar]
             if protocol == 'inproc':
                 host = 'localhost'
             else:
                 host = rest.split(':')[0]
-            template = dask.config.get('distributed.dashboard.link')
+            template = dask.config.get(dconf)
             address = template.format(host=host, port=port, **os.environ)
             text += "<a href='%(web)s' target='_blank'>%(web)s</a>\n" % {
                 'web': address}
@@ -141,7 +163,9 @@ class LSSTDaskClient(Client):
 
         if info:
             workers = len(info['workers'])
-            threads = sum(w['nthreads'] for w in info['workers'].values())
+            # Get correct thread count name for Distributed version
+            thread_var = self._dask_map["nthreads"][self._new_distributed]
+            threads = sum(w[thread_var] for w in info['workers'].values())
             memory = sum(w['memory_limit'] for w in info['workers'].values())
             memory = format_bytes(memory)
             text2 = ("<h3>Cluster</h3>\n"
