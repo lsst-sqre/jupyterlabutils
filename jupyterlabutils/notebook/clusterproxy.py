@@ -24,7 +24,7 @@ class ClusterProxy(object):
     client = None
     cluster = None
     loop = None
-    dbvar = None
+    dbvar = "dummy"
     workers = {}
 
     def __init__(self, client):
@@ -32,14 +32,8 @@ class ClusterProxy(object):
             estr = "'client' argument must be dask.distributed.Client!"
             raise RuntimeError(estr)
         self.client = client
-        _dv = client.get_versions()['client']['packages']['required']
-        self._dbvar = "bokeh"
-        for val in _dv:
-            if val[0] == 'distributed':
-                _vv = val[1]
-                if semver.compare(_vv, '2.0.0') != -1:
-                    self._dbvar = "dashboard"
-
+        # I don't understand why client.get_versions() hangs.  But it
+        #  does for LSSTDaskClient.
         self.logger = logging.getLogger(__name__)
         self.cluster = client.cluster
         self.loop = client.loop
@@ -48,12 +42,17 @@ class ClusterProxy(object):
         if sched:
             svc = sched.get("services")
             if svc:
-                port = svc.get(self._dbvar)
-                if port:
-                    self.scheduler_url = get_proxy_url(port) + "/status"
+                # So rather than being clever about it via get_versions,
+                #  we try first "dashboard" (distributed >= 2.0), and then
+                #  "bokeh" ( distributed < 2.0)
+                for portname in ["dashboard", "bokeh"]:
+                    port = svc.get(portname)
+                    if port:
+                        self._dbvar = portname
+                        self.scheduler_url = get_proxy_url(port) + "/status"
+                        break
                 else:
-                    self.logger.warning("No port for '" + self._dbvar +
-                                        "' service.")
+                    self.logger.warning("No port for dashboard service.")
             else:
                 self.logger.warning("No services for scheduler.")
         else:
@@ -110,7 +109,7 @@ class ClusterProxy(object):
             return None
         port = svc.get(self._dbvar)
         if not port:
-            self.logger.warning("No '{}' service".format(self._dbvar))
+            self.logger.warning("No dashboard service")
             return None
         if ipaddr.is_loopback:
             proxy = None
