@@ -54,9 +54,10 @@ setuptools.setup(
     install_requires=[
         'bokeh>=0.12.15',
         'maproxy',
-        'dask>=2.0.0',
-        'distributed>=2.0.0',
+        'dask',
+        'distributed',
         'pyvo>=1.0',
-        'requests>=2.22.0'
+        'requests>=2.18',
+        'semver'
     ],
 )
