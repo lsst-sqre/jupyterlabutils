@@ -29,7 +29,7 @@ class LSSTDaskClient(Client):
                      False: "ncores"},
         "dashboard": {True: "dashboard",
                       False: "bokeh"}
-        }
+    }
 
     def __init__(self, *args, **kwargs):
         ot = kwargs.pop('overall_timeout', None)
@@ -141,7 +141,7 @@ class LSSTDaskClient(Client):
         text += "  <li><b>Dashboard: </b>"
         # Get correct dashboard name for Distributed version
         dbvar = self._dask_map["dashboard"][self._new_distributed]
-        dconf = "distributed.{}.link".format(dbvar)
+        dconf = "distributed.dashboard.link"
         if self.proxy_url:
             url = self.proxy_url + "/status"
             text += "<br> "
