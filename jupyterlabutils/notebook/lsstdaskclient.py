@@ -12,15 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 class LSSTDaskClient(Client):
-    """This uses the proxy info to provide an externally-reachable dashboard
-    URL for the Client.  It assumes the LSST JupyterLab environment, and uses
-    an "overall_timeout" parameter for how long to wait on a cell's results
-    before giving up; this parameter is an integer, represents the wait time
-    in seconds, and defaults to 3600 (-1 is "never time out).  Otherwise it
-    is a standard Dask client.
+    """This uses the proxy info to provide an externally-reachable
+    dashboard URL for the Client.  It assumes the LSST JupyterLab
+    environment, and uses a "sync_timeout" parameter for how long to
+    wait on a cell's results before giving up; this parameter is an
+    integer, represents the wait time in seconds.  If (and only if)
+    sync_timeout is specified, LSSTDaskClient will replace its sync()
+    method with one that respects the timeout.  Otherwise it is a
+    standard Dask client.
+
     """
     proxy_url = None
-    overall_timeout = 3600
+    overall_timeout = None
     _new_distributed = True
     # "ncores" parameter became "nthreads" in distributed 2.0;
     # "bokeh" service became "dashboard" in distributed 2.0.
@@ -39,6 +42,7 @@ class LSSTDaskClient(Client):
                 self.overall_timeout = None
             else:
                 self.overall_timeout = ot
+                self.sync = self._timeout_sync
         _dv = self.get_versions()['client']['packages']['required']
         for val in _dv:
             if val[0] == 'distributed':
@@ -46,8 +50,8 @@ class LSSTDaskClient(Client):
                 if semver.compare(_vv, '2.0.0') == -1:
                     self._new_distributed = False
 
-    def sync(self, func, *args, asynchronous=None, callback_timeout=None,
-             **kwargs):
+    def _timeout_sync(self, func, *args, asynchronous=None,
+                      callback_timeout=None, **kwargs):
         if (
             asynchronous
             or self.asynchronous
