@@ -18,6 +18,7 @@ def _get_auth():
     auth.add_security_method_for_url(tap_url, 'lsst-token')
     auth.add_security_method_for_url(tap_url + '/sync', 'lsst-token')
     auth.add_security_method_for_url(tap_url + '/async', 'lsst-token')
+    auth.add_security_method_for_url(tap_url + '/tables', 'lsst-token')
     return auth
 
 def get_catalog():
