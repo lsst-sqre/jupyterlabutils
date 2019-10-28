@@ -1,5 +1,8 @@
-import requests
+import base64
 import os
+import time
+
+import requests
 import pyvo
 import pyvo.auth.authsession
 
@@ -28,9 +31,25 @@ def _get_token():
 
 
 def _validate_token(token):
-    # We can get more sophisticated later
-    if not token:
-        raise ValueError("No access token")
+    if token is None:
+        raise Exception('You have no authorization token.')
+
+    token_parts = token.split('.')
+
+    if len(token_parts) != 3:
+        raise Exception('Your token is malformed.')
+
+    (token_header, token_payload, token_signature) = token_parts
+
+    # If the payload isn't padded to the right amount, add some extra padding.
+    # Python complains about lack of padding, but not extra padding
+    token_dict = json.loads(base64.b64decode(token_payload + '====='))
+
+    exp = time.gmtime(int(token_dict['exp']))
+    current_time = time.gmtime()
+
+    if current_time > exp:
+        raise Exception('Your token is expired!')
 
 
 def _get_auth():
