@@ -1,0 +1,4 @@
+test:
+  username: "user"
+  host: "endpoint.edu"
+  password: "passwd"

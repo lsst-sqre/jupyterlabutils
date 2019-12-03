@@ -20,16 +20,25 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import aioinflux
+import asyncio
 import pandas as pd
 
-from .find_credentials import cred_by_secret, cred_by_env, cred_by_file
+from jupyterlabutils.notebook import NotebookAuth
 
 class EFD_client:
     """Class to handle connections and basic queries"""
-    def __init__(self, endpoint=None, username=None, password=None):
-        pass
+    def __init__(self, efd_name, db_name='efd', port='443', path_to_creds=None):
+        self.auth = NotebookAuth(path=path_to_creds)
+        self.host, self.user, self.password = self.auth.getAuth(efd_name)
+        self.client = aioinflux.InfluxDBClient(host=self.host, 
+                                               port=port, 
+                                               ssl=True, 
+                                               username=username, 
+                                               password=password,
+                                               db=db_name)
+        self.client.output = 'dataframe'
 
-    def select_time_series(self, topic_names, t1, t2, is_window=False):
+    def select_time_series(self, topic_name, fields, t1, t2, is_window=False):
         """Select a time series for a set of topics in a single subsystem"""
 
         ## TODO: make sure to take care of time zones.  Assume GMT by default?
@@ -47,21 +56,20 @@ class EFD_client:
             raise TypeError('The second time argument must be the time stamp for the end ' +
                             'or a time delta from the beginning')
 
-        # Do the actual query
-        base = None
-        topics = []
-        for n in topic_names:
-            parts = '.'.split(n)  # Split the namespace from the topic name
-            if len(parts) < 2:
-                raise ValueError(f'Topic names must be fully qualified: {n}')
-            if not base:
-                base = '.'.join(parts[:-1])
-                topics.append(parts[-1])
-            else:
-                tmp_base = '.'.join(parts[:-1])
-                if base != tmp_base:
-                    raise ValueError(f'Topics must be from the same subsystem: ' +
-                                     '{base} and {tmp_base} do not match')
-                topics.append(parts[-1])
+        if isinstance(fields, str):
+            fields = [fields,]
+        elif isinstance(fields, bytes):
+            fields = fields.decode()
+            fields = [fields,]
 
         # Build query here
+        if not base:
+            raise ValueError(f'No subsystem specified')
+        query = f'FROM {topic_name} select {", ".join(fields)}'
+        if timespan:
+            query = f'{query} WHERE {timespan}'
+
+        # Do query
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(self.client.query(query))
