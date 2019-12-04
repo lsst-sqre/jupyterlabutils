@@ -20,56 +20,119 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import aioinflux
-import asyncio
+from collections import Counter
+import logging
 import pandas as pd
 
 from jupyterlabutils.notebook import NotebookAuth
 
-class EFD_client:
+
+class EfdClient:
     """Class to handle connections and basic queries"""
-    def __init__(self, efd_name, db_name='efd', port='443', path_to_creds=None):
+    def __init__(self, efd_name, db_name='efd', port='443', path_to_creds='~/.lsst/notebook_auth.yaml'):
+        self.db_name = db_name
         self.auth = NotebookAuth(path=path_to_creds)
-        self.host, self.user, self.password = self.auth.getAuth(efd_name)
-        self.client = aioinflux.InfluxDBClient(host=self.host, 
-                                               port=port, 
-                                               ssl=True, 
-                                               username=username, 
-                                               password=password,
-                                               db=db_name)
+        self.host, self.user, self.password = self.auth.get_auth(efd_name)
+        self.client = aioinflux.InfluxDBClient(host=self.host,
+                                               port=port,
+                                               ssl=True,
+                                               username=self.user,
+                                               password=self.password,
+                                               db=db_name,
+                                               mode='async')  # mode='blocking')
         self.client.output = 'dataframe'
 
-    def select_time_series(self, topic_name, fields, t1, t2, is_window=False):
-        """Select a time series for a set of topics in a single subsystem"""
+    async def get_topics(self):
+        topics = await self.client.query('SHOW MEASUREMENTS')
+        return topics['name'].tolist()
 
-        ## TODO: make sure to take care of time zones.  Assume GMT by default?
-        timespan = ''
-        if not isinstance(t1, pd.TimeStamp):
+    async def get_fields(self, topic_name):
+        fields = await self.client.query(f'SHOW FIELD KEYS FROM "{self.db_name}"."autogen"."{topic_name}"')
+        return fields['fieldKey'].tolist()
+
+    async def select_time_series(self, topic_name, fields, t1, t2, is_window=False):
+        """Select a time series for a set of topics in a single subsystem"""
+        if not t1.tz.zone == 'UTC':
+            logging.warn('Timestamps must be in UTC.  Converting...')
+            t1 = t1.tz_convert(tz='UTC')
+
+        if not isinstance(t1, pd.Timestamp):
             raise TypeError('The first time argument must be a time stamp')
-        if isinstance(t2, pd.TimeStamp):
-            timespan = f'time >= {t1.isoformat} and time <= {t2.isoformat}'
-        elif isinstance(t2, pd.TimeDelta):
+        if isinstance(t2, pd.Timestamp):
+            t2 = t2.tz_convert(tz='UTC')
+            start = t1.isoformat()
+            end = t2.isoformat()
+        elif isinstance(t2, pd.Timedelta):
             if is_window:
-                timespan = f'time >= {(t1 - t2/2).isoformat} and time <= {(t1 + t2/2).isoformat}'
+                start = (t1 - t2/2).isoformat()
+                end = (t1 + t2/2).isoformat()
             else:
-                timespan = f'time >= {t1.isoformat} and time <= {(t2 + t2}.isoformat}'
+                start = t1.isoformat()
+                end = (t1 + t2).isoformat()
         else:
             raise TypeError('The second time argument must be the time stamp for the end ' +
-                            'or a time delta from the beginning')
+                            'or a time delta.')
 
-        if isinstance(fields, str):
-            fields = [fields,]
+        timespan = f"time >= '{start}' AND time <= '{end}'"
+
+        if '*' == fields.strip():
+            fields = await self.get_fields(topic_name)  # special case *
+        elif isinstance(fields, str):
+            fields = [fields, ]
         elif isinstance(fields, bytes):
             fields = fields.decode()
-            fields = [fields,]
+            fields = [fields, ]
 
         # Build query here
-        if not base:
-            raise ValueError(f'No subsystem specified')
-        query = f'FROM {topic_name} select {", ".join(fields)}'
-        if timespan:
-            query = f'{query} WHERE {timespan}'
+        query = f'SELECT {", ".join(fields)} FROM "{self.db_name}"."autogen"."{topic_name}" WHERE {timespan}'
 
         # Do query
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop.run_until_complete(self.client.query(query))
+        return await self.client.query(query)
+
+    def _make_fields(self, fields, base_fields):
+        # Count the number of occurences of each base field
+        count = Counter([bfield for bfield in base_fields for field in fields if bfield in field])
+        # Make sure all the base fields occur the same number of times
+        if len(set(count.values())) != 1:
+            raise ValueError('All array fields are not the same length')
+        n = set(count.values()).pop()  # Get number of elements
+        ret = {}
+        for bfield in base_fields:
+            for i in range(n):
+                fname = f'{bfield}{i}'
+                if fname not in fields:
+                    raise ValueError(f'Field {fname} not in list of possible fields')
+                ret.setdefault(bfield, default=[]).append(fname)
+        return ret, n
+
+    async def select_packed_time_series(self, topic_name, base_fields, t1, t2,
+                                        is_window=False, ref_timestamp_col="cRIO_timestamp"):
+        """Select fields that are time samples and unpack them into a dataframe"""
+        fields = await self.get_fields(topic_name)
+        qfields, els = self._make_fields(fields, base_fields)
+        field_list = []
+        for k in qfields:
+            field_list += qfields[k]
+        result = await self.select_time_series(topic_name, field_list+[ref_timestamp_col, ],
+                                               t1, t2, is_window=is_window)
+        times = []
+        timestamps = []
+        vals = {}
+        step = 1./els
+        for row in result.itertuples():
+            for i in range(els):
+                t = getattr(row, ref_timestamp_col)
+                times.append(t + i*step)
+                timestamps.append((pd.Timestamp(t, unit='s', tz='UTC') + pd.Timedelta(i*step, unit='s')))
+                for k in qfields:
+                    fld = f'{k}{i}'
+                    if fld not in qfields[k]:
+                        raise ValueError(f'{fld} not in field list')
+                    vals.setdefault(k, default=[]).append(getattr(row, fld))
+        return pd.DataFrame(vals.update({'times': times}), index=timestamps)
+
+
+def resample(df1, df2, sort_type='time'):
+    df = df1.append(df2, sort=False)  # Sort in this context does not sort the data
+    df = df.sort_index()
+    return df.interpolate(type=sort_type)

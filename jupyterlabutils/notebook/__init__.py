@@ -8,7 +8,8 @@ from .lsstdaskclient import LSSTDaskClient
 from .utils import format_bytes, get_proxy_url, get_hostname, \
     show_with_bokeh_server
 from .auth_helper import NotebookAuth
+from .efd_helper import EfdClient
 
 __all__ = [ClusterProxy, Forwarder, LSSTDaskClient, format_bytes,
            get_catalog, retrieve_query, get_proxy_url, get_hostname,
-           show_with_bokeh_server, NotebookAuth]
+           show_with_bokeh_server, NotebookAuth, EfdClient]
