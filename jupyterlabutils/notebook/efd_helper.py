@@ -52,6 +52,8 @@ class EfdClient:
 
     async def select_time_series(self, topic_name, fields, t1, t2, is_window=False):
         """Select a time series for a set of topics in a single subsystem"""
+        if not t1.tz:
+            raise ValueError('No timezone information found.  Timezone must be set.')
         if not t1.tz.zone == 'UTC':
             logging.warn('Timestamps must be in UTC.  Converting...')
             t1 = t1.tz_convert(tz='UTC')
@@ -75,9 +77,7 @@ class EfdClient:
 
         timespan = f"time >= '{start}' AND time <= '{end}'"
 
-        if '*' == fields.strip():
-            fields = await self.get_fields(topic_name)  # special case *
-        elif isinstance(fields, str):
+        if isinstance(fields, str):
             fields = [fields, ]
         elif isinstance(fields, bytes):
             fields = fields.decode()
@@ -87,7 +87,11 @@ class EfdClient:
         query = f'SELECT {", ".join(fields)} FROM "{self.db_name}"."autogen"."{topic_name}" WHERE {timespan}'
 
         # Do query
-        return await self.client.query(query)
+        ret = await self.client.query(query)
+        if not isinstance(ret, pd.DataFrame) and not ret:
+            # aioinflux returns an empty dict for an empty query
+            ret = pd.DataFrame()
+        return ret
 
     def _make_fields(self, fields, base_fields):
         # Count the number of occurences of each base field
