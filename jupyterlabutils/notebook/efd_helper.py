@@ -20,7 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import aioinflux
-from collections import Counter
+from functools import partial
 import logging
 import pandas as pd
 
@@ -33,49 +33,49 @@ class EfdClient:
         self.db_name = db_name
         self.auth = NotebookAuth(path=path_to_creds)
         self.host, self.user, self.password = self.auth.get_auth(efd_name)
-        self.client = aioinflux.InfluxDBClient(host=self.host,
-                                               port=port,
-                                               ssl=True,
-                                               username=self.user,
-                                               password=self.password,
-                                               db=db_name,
-                                               mode='async')  # mode='blocking')
-        self.client.output = 'dataframe'
+        self.influx_client = aioinflux.InfluxDBClient(host=self.host,
+                                                      port=port,
+                                                      ssl=True,
+                                                      username=self.user,
+                                                      password=self.password,
+                                                      db=db_name,
+                                                      mode='async')  # mode='blocking')
+        self.influx_client.output = 'dataframe'
 
     async def get_topics(self):
-        topics = await self.client.query('SHOW MEASUREMENTS')
+        topics = await self.influx_client.query('SHOW MEASUREMENTS')
         return topics['name'].tolist()
 
     async def get_fields(self, topic_name):
-        fields = await self.client.query(f'SHOW FIELD KEYS FROM "{self.db_name}"."autogen"."{topic_name}"')
+        fields = await self.influx_client.query(f'SHOW FIELD KEYS FROM "{self.db_name}"."autogen"."{topic_name}"')
         return fields['fieldKey'].tolist()
 
-    async def select_time_series(self, topic_name, fields, t1, t2, is_window=False):
+    async def select_time_series(self, topic_name, fields, start, end, is_window=False):
         """Select a time series for a set of topics in a single subsystem"""
-        if not t1.tz:
+        if not start.tz:
             raise ValueError('No timezone information found.  Timezone must be set.')
-        if not t1.tz.zone == 'UTC':
+        if not start.tz.zone == 'UTC':
             logging.warn('Timestamps must be in UTC.  Converting...')
-            t1 = t1.tz_convert(tz='UTC')
+            start = start.tz_convert(tz='UTC')
 
-        if not isinstance(t1, pd.Timestamp):
+        if not isinstance(start, pd.Timestamp):
             raise TypeError('The first time argument must be a time stamp')
-        if isinstance(t2, pd.Timestamp):
-            t2 = t2.tz_convert(tz='UTC')
-            start = t1.isoformat()
-            end = t2.isoformat()
-        elif isinstance(t2, pd.Timedelta):
+        if isinstance(end, pd.Timestamp):
+            end = end.tz_convert(tz='UTC')
+            start_str = start.isoformat()
+            end_str = end.isoformat()
+        elif isinstance(end, pd.Timedelta):
             if is_window:
-                start = (t1 - t2/2).isoformat()
-                end = (t1 + t2/2).isoformat()
+                start_str = (start - end/2).isoformat()
+                end_str = (start + end/2).isoformat()
             else:
-                start = t1.isoformat()
-                end = (t1 + t2).isoformat()
+                start_str = start.isoformat()
+                end_str = (start + end).isoformat()
         else:
             raise TypeError('The second time argument must be the time stamp for the end ' +
                             'or a time delta.')
 
-        timespan = f"time >= '{start}' AND time <= '{end}'"
+        timespan = f"time >= '{start_str}' AND time <= '{end_str}'"
 
         if isinstance(fields, str):
             fields = [fields, ]
@@ -87,53 +87,86 @@ class EfdClient:
         query = f'SELECT {", ".join(fields)} FROM "{self.db_name}"."autogen"."{topic_name}" WHERE {timespan}'
 
         # Do query
-        ret = await self.client.query(query)
+        ret = await self.influx_client.query(query)
+        if not isinstance(ret, pd.DataFrame) and not ret:
+            # aioinflux returns an empty dict for an empty query
+            ret = pd.DataFrame()
+        return ret
+
+    async def select_top_n(self, topic_name, fields, num):
+        """Select the most recent N samples from a set of topics in a single subsystem.
+           This method does not guarantee returned sorting direction rows.
+        """
+
+        # The "GROUP BY" is necessary to return the tags
+        limit = f"GROUP BY * ORDER BY DESC LIMIT {num}"
+
+        if isinstance(fields, str):
+            fields = [fields, ]
+        elif isinstance(fields, bytes):
+            fields = fields.decode()
+            fields = [fields, ]
+
+        # Build query here
+        query = f'SELECT {", ".join(fields)} FROM "{self.db_name}"."autogen"."{topic_name}" {limit}'
+
+        # Do query
+        ret = await self.influx_client.query(query)
         if not isinstance(ret, pd.DataFrame) and not ret:
             # aioinflux returns an empty dict for an empty query
             ret = pd.DataFrame()
         return ret
 
     def _make_fields(self, fields, base_fields):
-        # Count the number of occurences of each base field
-        count = Counter([bfield for bfield in base_fields for field in fields if bfield in field])
-        # Make sure all the base fields occur the same number of times
-        if len(set(count.values())) != 1:
-            raise ValueError('All array fields are not the same length')
-        n = set(count.values()).pop()  # Get number of elements
         ret = {}
+        n = None
         for bfield in base_fields:
-            for i in range(n):
-                fname = f'{bfield}{i}'
-                if fname not in fields:
-                    raise ValueError(f'Field {fname} not in list of possible fields')
-                ret.setdefault(bfield, default=[]).append(fname)
+            for field in fields:
+                if field.startswith(bfield) and field[len(bfield):].isdigit():  # Check prefix is complete
+                    ret.setdefault(bfield, []).append(field)
+            if n is None:
+                n = len(ret[bfield])
+            if n != len(ret[bfield]):
+                raise ValueError(f'Field lengths do not agree for {bfield}: {n} vs. {len(ret[bfield])}')
+
+            def sorter(prefix, val):
+                return int(val[len(prefix):])
+
+            part = partial(sorter, bfield)
+            ret[bfield].sort(key=part)
         return ret, n
 
-    async def select_packed_time_series(self, topic_name, base_fields, t1, t2,
+    async def select_packed_time_series(self, topic_name, base_fields, start, end,
                                         is_window=False, ref_timestamp_col="cRIO_timestamp"):
         """Select fields that are time samples and unpack them into a dataframe"""
         fields = await self.get_fields(topic_name)
+        if isinstance(base_fields, str):
+            base_fields = [base_fields, ]
+        elif isinstance(base_fields, bytes):
+            base_fields = base_fields.decode()
+            base_fields = [base_fields, ]
         qfields, els = self._make_fields(fields, base_fields)
         field_list = []
         for k in qfields:
             field_list += qfields[k]
         result = await self.select_time_series(topic_name, field_list+[ref_timestamp_col, ],
-                                               t1, t2, is_window=is_window)
+                                               start, end, is_window=is_window)
         times = []
         timestamps = []
         vals = {}
         step = 1./els
-        for row in result.itertuples():
+        for tstamp, row in result.iterrows():  # for large numbers of columns itertuples doesn't work
+            t = getattr(row, ref_timestamp_col)
             for i in range(els):
-                t = getattr(row, ref_timestamp_col)
                 times.append(t + i*step)
                 timestamps.append((pd.Timestamp(t, unit='s', tz='UTC') + pd.Timedelta(i*step, unit='s')))
                 for k in qfields:
                     fld = f'{k}{i}'
                     if fld not in qfields[k]:
                         raise ValueError(f'{fld} not in field list')
-                    vals.setdefault(k, default=[]).append(getattr(row, fld))
-        return pd.DataFrame(vals.update({'times': times}), index=timestamps)
+                    vals.setdefault(k, []).append(getattr(row, fld))
+        vals.update({'times': times})
+        return pd.DataFrame(vals, index=timestamps)
 
 
 def resample(df1, df2, sort_type='time'):
