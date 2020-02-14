@@ -43,12 +43,19 @@ class LSSTDaskClient(Client):
             else:
                 self.overall_timeout = ot
                 self.sync = self._timeout_sync
-        _dv = self.get_versions()['client']['packages']['required']
-        for val in _dv:
-            if val[0] == 'distributed':
-                _vv = val[1]
-                if semver.compare(_vv, '2.0.0') == -1:
-                    self._new_distributed = False
+        _dv = self.get_versions()['client']['packages']
+        rq = _dv.get('required')
+        if rq:
+            for val in rq:
+                if val[0] == 'distributed':
+                    _vv = val[1]
+                    if semver.compare(_vv, '2.0.0') == -1:
+                        self._new_distributed = False
+                        break
+        # If there is no 'required' field than we have the new style
+        #  (distributed >= 2.10 or so) where client->packages is just a dict
+        #  and we don't even have to check, because distributed is in fact
+        #  much newer than 2.0.0
 
     def _timeout_sync(self, func, *args, asynchronous=None,
                       callback_timeout=None, **kwargs):
