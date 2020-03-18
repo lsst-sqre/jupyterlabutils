@@ -53,6 +53,7 @@ setuptools.setup(
     keywords='lsst',
     install_requires=[
         'bokeh>=0.12.15',
+        'kubernetes>=9.0.0',
         'maproxy',
         'dask',
         'distributed',
