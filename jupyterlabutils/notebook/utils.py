@@ -2,6 +2,7 @@
 """
 import bokeh
 import os
+from kubernetes import client, config
 from urllib.parse import urljoin
 
 
@@ -66,3 +67,21 @@ def show_with_bokeh_server(obj):
         return get_proxy_url(port) or '*'
 
     bokeh.io.show(obj, notebook_url=jupyter_proxy_url)
+
+
+def get_pod():
+    """Get pod record.  Throws an error if you're not running in a cluster.
+    """
+    config.load_incluster_config()
+    api = client.CoreV1Api()
+    namespace = 'default'
+    with open('/var/run/secrets/kubernetes.io/serviceaccount/namespace',
+              'r') as f:
+        namespace = f.readlines()[0]
+    pod = api.read_namespaced_pod(get_hostname(), namespace)
+    return pod
+
+
+def get_node():
+    """Extract node name from pod."""
+    return get_pod().spec.node_name
