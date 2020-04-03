@@ -37,19 +37,6 @@ def format_bytes(n):
     return '%d B' % n
 
 
-def get_proxy_url(port):
-    """Assumes the LSST environment and that nbserverproxy is running.
-    Returns the external address that will resolve to the supplied port
-    """
-    if not port:
-        return None
-
-    base_url = os.environ.get('EXTERNAL_URL') or 'http://localhost:8888'
-    service_url_path = os.environ.get('JUPYTERHUB_SERVICE_PREFIX')
-    proxy_url_path = 'proxy/{port}'.format(port=port)
-    return urljoin(urljoin(base_url, service_url_path), proxy_url_path)
-
-
 def get_hostname():
     """Utility function to return hostname or, failing that, "localhost".
     """
