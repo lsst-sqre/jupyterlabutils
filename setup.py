@@ -53,10 +53,8 @@ setuptools.setup(
     keywords='lsst',
     install_requires=[
         'bokeh>=0.12.15',
-        'kubernetes>=9.0.0',
+        'kubernetes>=10.0.0',
         'maproxy',
-        'dask',
-        'distributed',
         'pyvo>=1.0',
         'requests>=2.18',
         'semver'
