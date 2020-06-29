@@ -57,6 +57,7 @@ setuptools.setup(
         'maproxy',
         'pyvo>=1.0',
         'requests>=2.18',
+        'jupyterhubutils>=0.23.0',
         'semver'
     ],
 )

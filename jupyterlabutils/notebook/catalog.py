@@ -1,11 +1,10 @@
-import base64
-import json
 import os
-import time
 
 import requests
 import pyvo
 import pyvo.auth.authsession
+
+from jupyterhubutils.utils import get_access_token, parse_access_token
 
 
 def _get_tap_url():
@@ -16,41 +15,14 @@ def _get_tap_url():
 
 
 def _get_token():
-    # Start with environment variable, if it's there.
-    token = os.getenv('ACCESS_TOKEN', default="")
-    # But if we have a token file, use it preferentially.
-    try:
-        with open(os.path.join(os.getenv('HOME'), ".access_token"), "r") as f:
-            # We could do token age calculations here based on PPID age and
-            #  file age to determine which one to use.
-            token = f.read().strip()
-    except FileNotFoundError:
-        pass  # We might have it in the environment, and if not, the token
-        # will fail validation
-    _validate_token(token)
+    '''Returns access token if (and only if) it is valid; otherwise throws
+    exception.'''
+    token = get_access_token()
+    gfendpoint = os.getenv("EXTERNAL_GAFAELFAWR_URL", None)
+    # parse_access_token() will throw an exception if the token is not
+    #  valid.
+    parse_access_token(endpoint=gfendpoint, token=token)
     return token
-
-
-def _validate_token(token):
-    if token is None:
-        raise Exception('You have no authorization token.')
-
-    token_parts = token.split('.')
-
-    if len(token_parts) != 3:
-        raise Exception('Your token is malformed.')
-
-    (token_header, token_payload, token_signature) = token_parts
-
-    # If the payload isn't padded to the right amount, add some extra padding.
-    # Python complains about lack of padding, but not extra padding
-    token_dict = json.loads(base64.b64decode(token_payload + '====='))
-
-    exp = time.gmtime(int(token_dict['exp']))
-    current_time = time.gmtime()
-
-    if current_time > exp:
-        raise Exception('Your token is expired!')
 
 
 def _get_auth():
