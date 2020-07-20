@@ -8,6 +8,7 @@ class Forwarder(maproxy.proxyserver.ProxyServer):
     """This creates a TCP proxy server running on a randomly-assigned
     dynamic local port.  Pass it the target host and port to construct it.
     """
+
     _ioloop = None
     _thread = None
     _logger = None
@@ -16,7 +17,7 @@ class Forwarder(maproxy.proxyserver.ProxyServer):
     def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(__name__)
         self._logger.debug("Creating TCP Forwarder")
-        sockets = tornado.netutil.bind_sockets(0, '')
+        sockets = tornado.netutil.bind_sockets(0, "")
         ioloop = None
         save_ioloop = None
         if "ioloop" in kwargs:
