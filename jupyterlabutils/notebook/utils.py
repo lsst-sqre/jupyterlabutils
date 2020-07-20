@@ -25,33 +25,34 @@ def format_bytes(n):
     (taken from dask.distributed, where it is not exported)
     """
     if n > 1e15:
-        return '%0.2f PB' % (n / 1e15)
+        return "%0.2f PB" % (n / 1e15)
     if n > 1e12:
-        return '%0.2f TB' % (n / 1e12)
+        return "%0.2f TB" % (n / 1e12)
     if n > 1e9:
-        return '%0.2f GB' % (n / 1e9)
+        return "%0.2f GB" % (n / 1e9)
     if n > 1e6:
-        return '%0.2f MB' % (n / 1e6)
+        return "%0.2f MB" % (n / 1e6)
     if n > 1e3:
-        return '%0.2f kB' % (n / 1000)
-    return '%d B' % n
+        return "%0.2f kB" % (n / 1000)
+    return "%d B" % n
 
 
 def get_hostname():
     """Utility function to return hostname or, failing that, "localhost".
     """
-    return os.environ.get('HOSTNAME') or 'localhost'
+    return os.environ.get("HOSTNAME") or "localhost"
 
 
 def show_with_bokeh_server(obj):
     """Method to wrap bokeh with proxy URL
     """
+
     def jupyter_proxy_url(port):
         """Construct proxy URL from environment
         """
         # If port is None we're asking about the URL
         # for the origin header.
-        return get_proxy_url(port) or '*'
+        return get_proxy_url(port) or "*"
 
     bokeh.io.show(obj, notebook_url=jupyter_proxy_url)
 
@@ -61,9 +62,10 @@ def get_pod():
     """
     config.load_incluster_config()
     api = client.CoreV1Api()
-    namespace = 'default'
-    with open('/var/run/secrets/kubernetes.io/serviceaccount/namespace',
-              'r') as f:
+    namespace = "default"
+    with open(
+        "/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r"
+    ) as f:
         namespace = f.readlines()[0]
     pod = api.read_namespaced_pod(get_hostname(), namespace)
     return pod

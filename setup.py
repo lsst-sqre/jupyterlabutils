@@ -7,7 +7,7 @@ import os
 import setuptools
 
 
-def get_version(file, name='__version__'):
+def get_version(file, name="__version__"):
     """Get the version of the package from the given file by
     executing it and extracting the given `name`.
     """
@@ -21,19 +21,19 @@ def get_version(file, name='__version__'):
 def local_read(filename):
     """Convenience function for includes"""
     full_filename = os.path.join(
-        os.path.abspath(os.path.dirname(__file__)),
-        filename)
-    return codecs.open(full_filename, 'r', 'utf-8').read()
+        os.path.abspath(os.path.dirname(__file__)), filename
+    )
+    return codecs.open(full_filename, "r", "utf-8").read()
 
 
-NAME = 'jupyterlabutils'
-DESCRIPTION = 'LSST utilites for JupyterLab environment'
+NAME = "jupyterlabutils"
+DESCRIPTION = "LSST utilites for JupyterLab environment"
 LONG_DESCRIPTION = local_read("README.md")
-VERSION = get_version('%s/_version.py' % NAME)
-AUTHOR = 'Adam Thornton'
-AUTHOR_EMAIL = 'athornton@lsst.org'
-URL = 'https://github.com/sqre-lsst/jupyterlabutils'
-LICENSE = 'MIT'
+VERSION = get_version("%s/_version.py" % NAME)
+AUTHOR = "Adam Thornton"
+AUTHOR_EMAIL = "athornton@lsst.org"
+URL = "https://github.com/sqre-lsst/jupyterlabutils"
+LICENSE = "MIT"
 
 setuptools.setup(
     name=NAME,
@@ -45,19 +45,19 @@ setuptools.setup(
     author_email=AUTHOR_EMAIL,
     license=LICENSE,
     classifiers=[
-        'Development Status :: 4 - Beta',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.5',
-        'License :: OSI Approved :: MIT License',
+        "Development Status :: 4 - Beta",
+        "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3.5",
+        "License :: OSI Approved :: MIT License",
     ],
-    keywords='lsst',
+    keywords="lsst",
     install_requires=[
-        'bokeh>=0.12.15',
-        'kubernetes>=10.0.0',
-        'maproxy',
-        'pyvo>=1.0',
-        'requests>=2.18',
-        'jupyterhubutils>=0.23.0',
-        'semver'
+        "bokeh>=0.12.15",
+        "kubernetes>=10.0.0",
+        "maproxy",
+        "pyvo>=1.0",
+        "requests>=2.18",
+        "jupyterhubutils>=0.23.0",
+        "semver",
     ],
 )

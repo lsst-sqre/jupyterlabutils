@@ -8,15 +8,15 @@ from jupyterhubutils.utils import get_access_token, parse_access_token
 
 
 def _get_tap_url():
-    if 'EXTERNAL_TAP_URL' in os.environ:
-        return os.environ['EXTERNAL_TAP_URL']
+    if "EXTERNAL_TAP_URL" in os.environ:
+        return os.environ["EXTERNAL_TAP_URL"]
     else:
-        return os.environ['EXTERNAL_INSTANCE_URL'] + os.environ['TAP_ROUTE']
+        return os.environ["EXTERNAL_INSTANCE_URL"] + os.environ["TAP_ROUTE"]
 
 
 def _get_token():
-    '''Returns access token if (and only if) it is valid; otherwise throws
-    exception.'''
+    """Returns access token if (and only if) it is valid; otherwise throws
+    exception."""
     token = get_access_token()
     gfendpoint = os.getenv("EXTERNAL_GAFAELFAWR_URL", None)
     # parse_access_token() will throw an exception if the token is not
@@ -28,13 +28,13 @@ def _get_token():
 def _get_auth():
     tap_url = _get_tap_url()
     s = requests.Session()
-    s.headers['Authorization'] = 'Bearer ' + _get_token()
+    s.headers["Authorization"] = "Bearer " + _get_token()
     auth = pyvo.auth.authsession.AuthSession()
-    auth.credentials.set('lsst-token', s)
-    auth.add_security_method_for_url(tap_url, 'lsst-token')
-    auth.add_security_method_for_url(tap_url + '/sync', 'lsst-token')
-    auth.add_security_method_for_url(tap_url + '/async', 'lsst-token')
-    auth.add_security_method_for_url(tap_url + '/tables', 'lsst-token')
+    auth.credentials.set("lsst-token", s)
+    auth.add_security_method_for_url(tap_url, "lsst-token")
+    auth.add_security_method_for_url(tap_url + "/sync", "lsst-token")
+    auth.add_security_method_for_url(tap_url + "/async", "lsst-token")
+    auth.add_security_method_for_url(tap_url + "/tables", "lsst-token")
     return auth
 
 
