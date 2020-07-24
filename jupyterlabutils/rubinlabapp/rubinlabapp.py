@@ -1,8 +1,5 @@
 import os
 from .labhubapp import SingleUserLabApp
-from traitlets import (
-    default
-)
 from urllib.parse import urlparse
 
 
