@@ -13,31 +13,31 @@ class RubinLabApp(SingleUserLabApp):
     '''
 
     @default('rubin_hub_api_url')
-    def _rubin_hub_api_url_default(self):
+    def _rubin_hub_api_url(self):
         return os.environ.get('JUPYTERHUB_API_URL') or ''
 
     @default('rubin_hub_api_host')
-    def _rubin_hub_api_host_default(self):
+    def _rubin_hub_api_host(self):
         return urlparse(os.environ.get('JUPYTERHUB_API_URL')).hostname or ''
 
     @default('rubin_hub_api_path')
-    def _rubin_hub_api_path_default(self):
+    def _rubin_hub_api_path(self):
         return urlparse(os.environ.get('JUPYTERHUB_API_URL')).path or ''
 
     @default('rubin_hub_api_scheme')
-    def _rubin_hub_api_scheme_default(self):
+    def _rubin_hub_api_scheme(self):
         return urlparse(os.environ.get('JUPYTERHUB_API_URL')).scheme or ''
 
     @default('rubin_hub_api_port')
-    def _rubin_hub_api_port_default(self):
+    def _rubin_hub_api_port(self):
         return urlparse(os.environ.get('JUPYTERHUB_API_URL')).port or ''
 
     @default('rubin_hub_api_token')
-    def _rubin_hub_api_token_default(self):
+    def _rubin_hub_api_token(self):
         return os.getenv('JUPYTERHUB_API_TOKEN') or ''
 
     @default('rubin_hub_user')
-    def _rubin_hub_user_default(self):
+    def _rubin_hub_user(self):
         return os.environ.get('JUPYTERHUB_USER') or ''
 
     def init_webapp(self, *args, **kwargs):
