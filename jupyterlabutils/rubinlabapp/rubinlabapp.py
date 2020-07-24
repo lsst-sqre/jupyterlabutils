@@ -12,44 +12,19 @@ class RubinLabApp(SingleUserLabApp):
     to perform its tasks.
     '''
 
-    @default('rubin_hub_api_url')
-    def _rubin_hub_api_url(self):
-        return os.environ.get('JUPYTERHUB_API_URL') or ''
-
-    @default('rubin_hub_api_host')
-    def _rubin_hub_api_host(self):
-        return urlparse(os.environ.get('JUPYTERHUB_API_URL')).hostname or ''
-
-    @default('rubin_hub_api_path')
-    def _rubin_hub_api_path(self):
-        return urlparse(os.environ.get('JUPYTERHUB_API_URL')).path or ''
-
-    @default('rubin_hub_api_scheme')
-    def _rubin_hub_api_scheme(self):
-        return urlparse(os.environ.get('JUPYTERHUB_API_URL')).scheme or ''
-
-    @default('rubin_hub_api_port')
-    def _rubin_hub_api_port(self):
-        return urlparse(os.environ.get('JUPYTERHUB_API_URL')).port or ''
-
-    @default('rubin_hub_api_token')
-    def _rubin_hub_api_token(self):
-        return os.getenv('JUPYTERHUB_API_TOKEN') or ''
-
-    @default('rubin_hub_user')
-    def _rubin_hub_user(self):
-        return os.environ.get('JUPYTERHUB_USER') or ''
-
     def init_webapp(self, *args, **kwargs):
         super().init_webapp(*args, **kwargs)
         s = self.tornado_settings
-        s['rubin_hub_api_url'] = self.rubin_hub_api_url
-        s['rubin_hub_api_host'] = self.rubin_hub_api_host
-        s['rubin_hub_api_path'] = self.rubin_hub_api_path
-        s['rubin_hub_api_scheme'] = self.rubin_hub_api_scheme
-        s['rubin_hub_api_port'] = self.rubin_hub_api_port
-        s['rubin_hub_api_token'] = self.rubin_hub_api_token
-        s['rubin_hub_user'] = self.rubin_hub_user
+        # These probably should be traitlets.
+        jh = os.environ.get('JUPYTERHUB_API_URL') or ''
+        s['rubin_hub_api_url'] = jh
+        ph = urlparse(jh)
+        s['rubin_hub_api_host'] = ph.hostname
+        s['rubin_hub_api_path'] = ph.path
+        s['rubin_hub_api_scheme'] = ph.scheme
+        s['rubin_hub_api_port'] = ph.port
+        s['rubin_hub_api_token'] = os.environ.get('JUPYTERHUB_API_TOKEN') or ''
+        s['rubin_hub_user'] = os.environ.get('JUPYTERHUB_USER') or ''
         # FIXME just want to see this work
         self.log.debug("Tornado settings: {}".format(s))
 
