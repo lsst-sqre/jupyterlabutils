@@ -57,7 +57,14 @@ setuptools.setup(
         "maproxy",
         "pyvo>=1.0",
         "requests>=2.18",
+        "jupyterlab>=2.2,<3",
         "jupyterhubutils>=0.24.1",
         "semver",
     ],
+    entry_points={
+        'console_scripts': [
+            'jupyter-labhub = jupyterlabutils.rubinlabapp.labhubapp:main',
+            'jupyter-rubinlab = jupyterlabutils.rubinlabapp.rubinlabapp:main'
+        ],
+    },
 )
