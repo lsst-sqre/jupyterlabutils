@@ -1,10 +1,16 @@
 import os
+from pathlib import Path
 
 import requests
 import pyvo
 import pyvo.auth.authsession
 
-from jupyterhubutils.utils import get_access_token, parse_access_token
+TOKEN_PATH = "/opt/lsst/software/jupyterlab/environment/ACCESS_TOKEN"
+"""Nublado 2 mounts the user's token here."""
+
+
+class TokenNotFoundError(Exception):
+    """No access token was found."""
 
 
 def _get_tap_url():
@@ -14,15 +20,17 @@ def _get_tap_url():
         return os.environ["EXTERNAL_INSTANCE_URL"] + os.environ["TAP_ROUTE"]
 
 
-def _get_token():
-    """Returns access token if (and only if) it is valid; otherwise throws
-    exception."""
-    token = get_access_token()
-    gfendpoint = os.getenv("EXTERNAL_GAFAELFAWR_URL", None)
-    # parse_access_token() will throw an exception if the token is not
-    #  valid.
-    parse_access_token(endpoint=gfendpoint, token=token)
-    return token
+def _get_token() -> str:
+    """Return notebook access token."""
+    token_path = Path(TOKEN_PATH)
+    if token_path.exists():
+        return token_path.read_text()
+    else:
+        token = os.environ.get("ACCESS_TOKEN", None)
+        if not token:
+            msg = f"{TOKEN_PATH} missing and ACCESS_TOKEN not set"
+            raise TokenNotFoundError(msg)
+        return token
 
 
 def _get_auth():
